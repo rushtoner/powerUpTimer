@@ -97,6 +97,9 @@
     <delete file="test.properties"/>
     <delete file="temp.properties"/>
     <delete file="${ant.project.name}-ant-jar.log"/>
+     <delete verbose="true">
+       <fileset dir="." includes="**/hs_err_pid*.log"/>
+     </delete>
   </target>
 
 
