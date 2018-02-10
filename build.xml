@@ -1,0 +1,103 @@
+<?xml version="1.0" ?>
+<project default="default" name="powerUpTimer" basedir=".">
+  <property file="../common.properties"/>
+  <property name="build" location="build"/>
+
+  <target name="init">
+    <buildnumber/>
+    <tstamp prefix="ts">
+      <format property="timestamp" pattern="yyyy-MM-dd HH:mm:ss"/>
+    </tstamp>
+    <echo message="build.number = ${build.number}"/>
+  </target>
+
+  <target name="default" depends="jar"> </target>
+
+  <path id="compile.classpath">
+    <pathelement location="${log4j.jar}"/>
+    <pathelement location="${xbee.jar}"/>
+    <pathelement location="libs/android-sdk-5.1.1.jar"/>
+    <pathelement location="libs/rxtx-2.2.jar"/>
+    <pathelement location="libs/slf4j-api-1.7.12.jar"/>
+    <pathelement location="libs/slf4j-nop-1.7.12.jar"/>
+    <pathelement location="libs/android-sdk-addon-3.jar"/>
+    <pathelement location="libs/slf4j-android-1.7.12.jar"/>
+    <pathelement location="libs/slf4j-jdk14-1.7.12.jar"/>
+    <pathelement location="libs/slf4j-simple-1.7.12.jar"/>
+  </path>
+
+  <target name="compile" depends="init">
+    <mkdir dir="build/classes"/>
+    <javac
+        srcdir="src"
+        destdir="build/classes"
+        classpathref="compile.classpath"
+        debug="on" debuglevel="lines,vars,source"
+        deprecation="yes"
+        includeantruntime="false"
+        bootclasspath="${boot_class_path}"
+      >
+        <!-- 
+        target="1.6" source="1.6" 
+        -->
+      <compilerarg value="-Xlint:all"/>
+      <compilerarg value="-Xmaxerrs"/> <compilerarg value="${error_count.max}"/>
+      <compilerarg value="-Xmaxwarns"/> <compilerarg value="${warning_count.max}"/>
+      <compilerarg value="-version"/>
+    </javac>
+
+  </target>
+
+
+  <path id="test.classpath">
+    <pathelement location="."/> <!-- to find the right log4j.properties -->
+    <pathelement location="build/${ant.project.name}.jar"/> <!-- tested classes -->
+    <pathelement location="build/test_classes"/> <!-- testing classes -->
+    <pathelement location="${log4j.jar}"/>
+  </path>
+
+
+  <target name="print_test_classpath">
+    <property name="cp" refid="test.classpath"/>
+    <echo message="test.classpath = ${cp}"/>
+  </target>
+
+
+  <target name="compile.tests" depends="jar">
+    <mkdir dir="build/test_classes"/>
+    <javac
+        srcdir="tests"
+        destdir="build/test_classes"
+        classpathref="test.classpath"
+        debug="on" debuglevel="lines,vars,source"
+        deprecation="yes"
+        includeantruntime="false"
+        bootclasspath="${boot_class_path}"
+      >
+        <!--
+        target="1.6" source="1.6"
+        -->
+
+      <compilerarg value="-Xlint:all"/>
+      <compilerarg value="-Xmaxerrs"/> <compilerarg value="${error_count.max}"/>
+      <compilerarg value="-Xmaxwarns"/> <compilerarg value="${warning_count.max}"/>
+      <compilerarg value="-version"/>
+    </javac>
+  </target>
+
+
+  <target name="jar" depends="compile">
+    <jar jarfile="build/${ant.project.name}.jar" basedir="build/classes" includes="**/*.class"/>
+  </target>
+
+
+  <target name="clean">
+    <delete dir="${build}" verbose="true"/>
+    <delete file="${ant.project.name}.log"/>
+    <delete file="test.properties"/>
+    <delete file="temp.properties"/>
+    <delete file="${ant.project.name}-ant-jar.log"/>
+  </target>
+
+
+</project>
