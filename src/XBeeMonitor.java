@@ -8,10 +8,10 @@ import com.digi.xbee.api.exceptions.XBeeException;
 import com.digi.xbee.api.io.IOLine;
 import com.digi.xbee.api.io.IOMode;
 import com.digi.xbee.api.io.IOSample;
+import com.digi.xbee.api.io.IOValue;
 import com.digi.xbee.api.listeners.IIOSampleReceiveListener;
 import com.digi.xbee.api.models.OperatingMode;
 import com.digi.xbee.api.exceptions.XBeeException;
-import com.digi.xbee.api.exceptions.TimeoutException;
 import java.util.List;
 
 /**
@@ -45,29 +45,34 @@ public class XBeeMonitor {
   }
 
 
+  protected XBeeDevice local = null;
+  protected RemoteXBeeDevice scale = null;
+  protected RemoteXBeeDevice redSwitch = null;
+
+
   public void invoke(String port) {
     System.out.println("XBeeMonitor, local port = " + port);
 		
     System.out.println("Creating localXBee...");
-    XBeeDevice localXBee = new XBeeDevice(port, BAUD_RATE);
-    System.out.println("created localXBee = " + localXBee);
+    this.local = new XBeeDevice(port, BAUD_RATE);
+    System.out.println("created local = " + this.local);
 
     try {
-      localXBee.open();
-      System.out.println("opened localXBee = " + toString(localXBee));
+      this.local.open();
+      System.out.println("opened local = " + toString(this.local));
       // System.out.println("Local XBee operating mode: " + localXBee.getOperatingMode());
       OperatingMode requiredMode = OperatingMode.API;
-      OperatingMode mode = localXBee.getOperatingMode();
+      OperatingMode mode = this.local.getOperatingMode();
       if (mode != requiredMode) {
-        throw new RuntimeException("localXBee is in " + mode + ",  not in " + requiredMode);
+        throw new RuntimeException("this.local is in " + mode + ",  not in " + requiredMode);
       }
       // Obtain the remote XBee device from the XBee network.
       System.out.println("Getting network...");
-      XBeeNetwork network = localXBee.getNetwork();
+      XBeeNetwork network = this.local.getNetwork();
       System.out.println("network = " + toString(network));
 
-      RemoteXBeeDevice scale = getRemote(localXBee, "SCALE");
-      RemoteXBeeDevice redSwitch = getRemote(localXBee, "RED SWITCH");
+      this.scale = getRemote("SCALE", false);
+      this.redSwitch = getRemote("RED SWITCH", false);
       // Set the local device as destination address of the remote.
       // remoteDevice.setDestinationAddress(localXBee.get64BitAddress());
       // remoteDevice.setIOConfiguration(DIGITAL_LINE, IOMode.DIGITAL_IN);
@@ -78,13 +83,54 @@ public class XBeeMonitor {
 			
       // Enable periodic sampling every IO_SAMPLING_RATE milliseconds in the remote device.
       // remoteDevice.setIOSamplingRate(IO_SAMPLING_RATE);
+
+      mainLoop();
 			
     } catch (XBeeException e) {
       e.printStackTrace();
-      localXBee.close();
+      this.local.close();
       System.err.println("Exception, ending: " + e.getMessage());
       System.exit(1);
     }
+  }
+
+
+  private void mainLoop() throws XBeeException {
+    boolean keepLooping = true;
+    int count = 0;
+    while (keepLooping) {
+      keepLooping = doOnce(count++);
+    }
+  }
+
+
+  private boolean doOnce(int loopCount) throws XBeeException {
+    boolean keepLooping = true;
+    // System.out.println("loopCount = " + loopCount);
+    System.out.print("Scale: " + getStatus(this.scale));
+    System.out.print("\tRed Switch: " + getStatus(this.redSwitch));
+    System.out.print('\r');
+
+    try {
+      Thread.sleep(100);
+    } catch(InterruptedException ex) {
+      System.err.println("\nDoh!");
+    }
+    if (loopCount % 10 == 0) {
+      // keepLooping = false;
+      System.out.println();
+    }
+    return keepLooping;
+  }
+
+
+  private IOValue ON = IOValue.LOW;
+  private IOValue OFF = IOValue.HIGH;
+
+  private String getStatus(RemoteXBeeDevice remote) throws XBeeException {
+    return String.format("D0: %-5s  D1: %-5s  D2: %-5s  D3: %-5s"
+      ,remote.getDIOValue(IOLine.DIO0_AD0) == ON ,remote.getDIOValue(IOLine.DIO1_AD1) == ON
+      ,remote.getDIOValue(IOLine.DIO2_AD2) == ON ,remote.getDIOValue(IOLine.DIO3_AD3) == ON);
   }
 
 
@@ -138,19 +184,21 @@ public class XBeeMonitor {
   }
 
 
-  private RemoteXBeeDevice getRemote(XBeeDevice local, String nodeId) throws XBeeException {
-    RemoteXBeeDevice remote = local.getNetwork().discoverDevice(nodeId);
+  private RemoteXBeeDevice getRemote(String nodeId, boolean setupListener) throws XBeeException {
+    RemoteXBeeDevice remote = this.local.getNetwork().discoverDevice(nodeId);
     System.out.println("remote = " + remote);
     if (remote == null) {
       throw new RuntimeException("Could not find remote XBee named " + nodeId);
     }
-    // Register a listener to handle the samples received by the local device.
-    local.addIOSampleListener(new IIOSampleReceiveListener() {
-      @Override
-      public void ioSampleReceived(RemoteXBeeDevice remoteDevice, IOSample ioSample) {
-        System.out.println("Sample from " + remoteDevice.getNodeID() + " = " + remoteDevice.get64BitAddress() + " - " + ioSample);
-      }
-    });
+    if (setupListener) {
+      // Register a listener to handle the samples received by the local device.
+      this.local.addIOSampleListener(new IIOSampleReceiveListener() {
+        @Override
+        public void ioSampleReceived(RemoteXBeeDevice remoteDevice, IOSample ioSample) {
+          System.out.printf("Sample from %-20s = %-16s is %s\n", remoteDevice.getNodeID(), remoteDevice.get64BitAddress(), ioSample.toString());
+        }
+      });
+    }
     return remote;
   }
 
