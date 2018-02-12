@@ -13,6 +13,12 @@ import com.digi.xbee.api.listeners.IIOSampleReceiveListener;
 import com.digi.xbee.api.models.OperatingMode;
 import com.digi.xbee.api.exceptions.XBeeException;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Properties;
+import java.io.File;
+import java.io.IOException;
+import java.io.Reader;
+import java.io.FileReader;
 
 /**
  * XBee Java Library Handle IO Samples sample application.
@@ -25,41 +31,35 @@ import java.util.List;
  */
 public class XBeeListener {
 	
-  // private static final String PORT = "COM1";
-  private static final String DAVIDS_38400_B = "/dev/tty.usbserial-DN02MNGT";
   private static final int BAUD_RATE = 9600;
 	
-  private static final String REMOTE_NODE_IDENTIFIER = "SCALE";
-	
-  // private static final IOLine DIGITAL_LINE = IOLine.DIO3_AD3;
-  // private static final IOLine ANALOG_LINE = IOLine.DIO2_AD2;
-	
-  // private static final Set<IOLine> MONITORED_LINES = EnumSet.of(DIGITAL_LINE);
-	
-  // private static final int IO_SAMPLING_RATE = 5000; // 5 seconds.
-
   private static final int SAMPLING_RATE_MS = 500;
 
-  public static void main(String[] args) {
+  public static void main(String[] args) throws Exception {
     XBeeListener m = new XBeeListener();
-    m.invoke(DAVIDS_38400_B);
+    m.invoke("xbee.properties");
   }
 
 
   protected XBeeDevice local = null;
-  protected RemoteXBeeDevice scale = null;
-  protected RemoteXBeeDevice redSwitch = null;
+  // protected RemoteXBeeDevice scale = null;
+  // protected RemoteXBeeDevice redSwitch = null;
 
 
-  public void invoke(String port) {
-    System.out.println("XBeeListener, local port = " + port);
-		
-    System.out.println("Creating localXBee...");
-    this.local = new XBeeDevice(port, BAUD_RATE);
-    System.out.println("created local = " + this.local);
+  public void invoke(String propsFileName) throws Exception {
+    Properties props = getProperties(propsFileName);
 
+    // new XBeeDevice(port, BAUD_RATE);
+    // String port = props.getProperty("port");
+    // System.out.println("port = " + port);
+    // System.out.println("Creating localXBee...");
+    // System.out.println("created local = " + this.local);
+
+    List<RemoteXBeeDevice> remotes = null;
+    
     try {
-      this.local.open();
+      this.local = getDevice(props);
+      remotes = getRemotes(props);
       System.out.println("opened local = " + toString(this.local));
       // System.out.println("Local XBee operating mode: " + localXBee.getOperatingMode());
       OperatingMode requiredMode = OperatingMode.API;
@@ -71,23 +71,7 @@ public class XBeeListener {
       System.out.println("Getting network...");
       XBeeNetwork network = this.local.getNetwork();
       System.out.println("network = " + toString(network));
-
-      boolean setupListener = true;
-      this.scale = getRemote("SCALE", setupListener);
-      this.redSwitch = getRemote("RED SWITCH", setupListener);
-      // Set the local device as destination address of the remote.
-      // remoteDevice.setDestinationAddress(localXBee.get64BitAddress());
-      // remoteDevice.setIOConfiguration(DIGITAL_LINE, IOMode.DIGITAL_IN);
-      // remoteDevice.setIOConfiguration(ANALOG_LINE, IOMode.ADC);
-			
-      // Enable DIO change detection in the remote device.
-      // remoteDevice.setDIOChangeDetection(MONITORED_LINES);
-			
-      // Enable periodic sampling every IO_SAMPLING_RATE milliseconds in the remote device.
-      // remoteDevice.setIOSamplingRate(IO_SAMPLING_RATE);
-
-      // mainLoop();
-			
+   
     } catch (XBeeException e) {
       e.printStackTrace();
       this.local.close();
@@ -97,35 +81,43 @@ public class XBeeListener {
   }
 
 
-  /*
-  private void mainLoop() throws XBeeException {
-    boolean keepLooping = true;
-    int count = 0;
-    while (keepLooping) {
-      keepLooping = doOnce(count++);
-    }
+  private XBeeDevice getDevice(Properties props) throws XBeeException {
+    String port = props.getProperty("port");
+    return getDevice(port);
   }
 
 
-  private boolean doOnce(int loopCount) throws XBeeException {
-    boolean keepLooping = true;
-    // System.out.println("loopCount = " + loopCount);
-    System.out.print("Scale: " + getStatus(this.scale));
-    System.out.print("\tRed Switch: " + getStatus(this.redSwitch));
-    System.out.print('\r');
-
-    try {
-      Thread.sleep(100);
-    } catch(InterruptedException ex) {
-      System.err.println("\nDoh!");
-    }
-    if (loopCount % 10 == 0) {
-      // keepLooping = false;
-      System.out.println();
-    }
-    return keepLooping;
+  private XBeeDevice getDevice(String port) throws XBeeException {
+    System.out.println("Creating localXBee on port " + port);
+    XBeeDevice device = new XBeeDevice(port, BAUD_RATE);
+    System.out.println("created device = " + device);
+    device.open();
+    return device;
   }
-  */
+
+
+
+  private List<RemoteXBeeDevice> getRemotes(Properties props) throws XBeeException {
+    List<RemoteXBeeDevice> list = new ArrayList<RemoteXBeeDevice>();
+
+    String tmp = props.getProperty("nodes");
+    String[] nodeIds = tmp.split(",");
+    System.out.println("nodeIds = " + toString(nodeIds));
+
+    boolean setupListener = true;
+    for(String nodeId: nodeIds) {
+      System.out.println("nodeId = " + nodeId);
+      try {
+        RemoteXBeeDevice remote = getRemote(nodeId, true);
+        System.out.println("Got remote = " + remote);
+        list.add(remote);
+      } catch (Exception ex) {
+        System.err.println("Failed to add remote: " + nodeId + " because " + ex.getMessage());
+      }
+    }
+    System.out.println("Found " + list.size() + " remotes.");
+    return list;
+  }
 
 
   private IOValue ON = IOValue.LOW;
@@ -175,6 +167,21 @@ public class XBeeListener {
   }
 
 
+  private String toString(String[] array) {
+    StringBuilder sb = new StringBuilder();
+    boolean first = true;
+    for(String str: array) {
+      if (first) {
+        first = false;
+      } else {
+        sb.append(", ");
+      }
+      sb.append(str);
+    }
+    return sb.toString();
+  }
+
+
   private final static char[] hexArray = "0123456789ABCDEF".toCharArray();
 
   private String toHex(byte[] bytes) {
@@ -189,57 +196,77 @@ public class XBeeListener {
 
 
   private RemoteXBeeDevice getRemote(String nodeId, boolean setupListener) throws XBeeException {
-    RemoteXBeeDevice remote = this.local.getNetwork().discoverDevice(nodeId);
-    remote.setIOSamplingRate(SAMPLING_RATE_MS);
-    System.out.println("remote = " + remote);
-    if (remote == null) {
-      throw new RuntimeException("Could not find remote XBee named " + nodeId);
-    }
-    if (setupListener) {
-      // Register a listener to handle the samples received by the local device.
-      this.local.addIOSampleListener(new IIOSampleReceiveListener() {
-        private long timerStart = 0L, timerTotal = 0L;
-        private boolean isRunning = false;
-        private final IOLine line = IOLine.DIO0_AD0;
-        private final IOValue TIMER_RUN = IOValue.LOW;
-        private final IOValue TIMER_STOP = IOValue.HIGH;
-        @Override
-        public void ioSampleReceived(RemoteXBeeDevice remote, IOSample sample) {
-          // System.out.printf "Sample from %-20s = %s is %s\n"
-          // System.out.printf("Sample from %-20s is %s\n" , remote.getNodeID(), remote.get64BitAddress(), toString(sample));
-          IOValue value = sample.getDigitalValue(line);
-          invoke(remote, value);
-        }
-        synchronized void invoke(RemoteXBeeDevice remote, IOValue value) {
-          if (value == TIMER_RUN) {
-            // TIMER_RUN
-            if (isRunning) {
-              // keep it running
-            } else {
-              // Start it
-              System.out.println("Start");
-              timerStart = System.currentTimeMillis();
-              isRunning = true;
-            }
-          } else {
-            // must be TIMER_STOP
-            if (isRunning) {
-              isRunning = false;
-              System.out.println("Stop");
-              timerTotal += System.currentTimeMillis() - timerStart;
-              System.out.println(remote.getNodeID() + ": " + timerTotal + " ms, isRunning = " + isRunning);
-            } else {
-              // do nothing
-            }
+    RemoteXBeeDevice remote = null;
+    try {
+      remote = this.local.getNetwork().discoverDevice(nodeId);
+      remote.setIOSamplingRate(SAMPLING_RATE_MS);
+      System.out.println("remote = " + remote);
+      if (remote == null) {
+        throw new RuntimeException("Could not find remote XBee named " + nodeId);
+      }
+      if (setupListener) {
+        // Register a listener to handle the samples received by the local device.
+        this.local.addIOSampleListener(new IIOSampleReceiveListener() {
+          private long timerStart = 0L, timerTotal = 0L;
+          private boolean isRunning = false;
+          private final IOLine line = IOLine.DIO0_AD0;
+          private final IOValue TIMER_RUN = IOValue.LOW;
+          private final IOValue TIMER_STOP = IOValue.HIGH;
+          @Override
+          public void ioSampleReceived(RemoteXBeeDevice remote, IOSample sample) {
+            // System.out.printf "Sample from %-20s = %s is %s\n"
+            // System.out.printf("Sample from %-20s is %s\n" , remote.getNodeID(), remote.get64BitAddress(), toString(sample));
+            IOValue value = sample.getDigitalValue(line);
+            invoke(remote, value);
           }
-        }       
-        private String toString(IOSample sample) {
-          return sample.toString();
-        }
-      });
+          synchronized void invoke(RemoteXBeeDevice remote, IOValue value) {
+            if (value == TIMER_RUN) {
+              // TIMER_RUN
+              if (isRunning) {
+                // keep it running
+              } else {
+                // Start it
+                System.out.println("Start");
+                timerStart = System.currentTimeMillis();
+                isRunning = true;
+              }
+            } else {
+              // must be TIMER_STOP
+              if (isRunning) {
+                isRunning = false;
+                System.out.println("Stop");
+                timerTotal += System.currentTimeMillis() - timerStart;
+                System.out.println(remote.getNodeID() + ": " + timerTotal + " ms, isRunning = " + isRunning);
+              } else {
+                // do nothing
+              }
+            }
+          }       
+          private String toString(IOSample sample) {
+            return sample.toString();
+          }
+        });
+      }
+    } catch (Exception ex) {
+      ex.printStackTrace(System.err);
+      System.err.println("Caught exception with remote " + nodeId);
     }
     return remote;
   }
 
+
+  private Properties getProperties(String fileName) throws IOException {
+    return getProperties(new File(fileName));
+  }
+
+  private Properties getProperties(File file) throws IOException {
+    return getProperties(new FileReader(file));
+  }
+
+  private Properties getProperties(Reader reader) throws IOException {
+    Properties props = new Properties();
+    props.load(reader);
+    return props;
+  }
 
 }
