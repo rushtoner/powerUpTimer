@@ -14,8 +14,10 @@
   <target name="default" depends="jar"> </target>
 
   <path id="compile.classpath">
+	  <!--
     <pathelement location="${log4j.jar}"/>
-    <pathelement location="${xbee.jar}"/>
+     -->
+    <pathelement location="libs/xbee-java-library-1.2.1.jar"/>
     <pathelement location="libs/android-sdk-5.1.1.jar"/>
     <pathelement location="libs/rxtx-2.2.jar"/>
     <pathelement location="libs/slf4j-api-1.7.12.jar"/>
