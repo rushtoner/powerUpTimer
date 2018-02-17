@@ -13,7 +13,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #pip install digi-xbee
 from digi.xbee.devices import XBeeDevice
-from digi.xbee.io import IOLine, IOMode
+from digi.xbee.io import IOLine, IOMode, IOValue
 
 # TODO: Replace with the serial port where your local module is connected to.
 PORT = "COM4"
@@ -25,10 +25,16 @@ REMOTE_NODE_ID = "SCALE"
 LEFT = IOLine.DIO0_AD0
 RIGHT = IOLine.DIO1_AD1
 
-DIGITAL_LINE = IOLine.DIO3_AD3
-ANALOG_LINE = IOLine.DIO2_AD2
+SWITCH_OPEN = IOValue.HIGH
+SWITCH_CLOSED = IOValue.LOW
 
-IO_SAMPLING_RATE = 1  # in seconds.
+#DIGITAL_LINE = IOLine.DIO3_AD3
+#ANALOG_LINE = IOLine.DIO2_AD2
+
+TIMER_RUNNING = 1 
+TIMER_STOPPED = 0
+
+IO_SAMPLING_RATE = 0.1  # in seconds.
 
 
 def main():
@@ -66,10 +72,35 @@ def main():
         remoteDevice.set_dio_change_detection({LEFT})
         remoteDevice.set_dio_change_detection({RIGHT})
 
+
+        scaleLeft = Scale()
+
         # Register a listener to handle the samples received by the local device.
         def io_samples_callback(sample, remote, time):
-            print("got sample")
-            print("New sample from %s - %s" % (remote.get_node_id(), sample))
+            try:
+                #print("New sample from %s - %s at %s" % (remote.get_node_id(), sample, str(time)))
+                newState = sample.get_digital_value(LEFT)
+                #print("new LEFT State = ", newState)
+                if (scaleLeft.state == TIMER_STOPPED):
+                    # timer is stopped
+                    if (sample.get_digital_value(LEFT) == SWITCH_CLOSED):
+                        #print("Timer was stopped, switch is now closed.")
+                        # Start the timer
+                        scaleLeft.start = time
+                        scaleLeft.state = TIMER_RUNNING
+                        #print("Starting timer at ", time)
+                else:
+                    # timer is running
+                    if (sample.get_digital_value(LEFT) == SWITCH_OPEN):
+                        #print("Timer was running, switch is now open.")
+                        # Stop the timer
+                        scaleLeft.state = TIMER_STOPPED
+                        elapsedSec = time - scaleLeft.start
+                        scaleLeft.total += elapsedSec
+                        print("Switch was closed for ", elapsedSec, " seconds, total time is ", scaleLeft.total)
+            except Exception as ex:
+                print("caught in callback: ", ex)
+                print("sys.exc_info(): " + sys.exc_info())
 
         print("Registering callback on ", remoteDevice)
         localDevice.add_io_sample_received_callback(io_samples_callback)
@@ -77,11 +108,17 @@ def main():
         # Wait for an input line to exit
         print("Press enter to exit")
         input()
+    except BaseException as ex:
+        print("Caught something: " + ex)
 
     finally:
         if localDevice is not None and localDevice.is_open():
             localDevice.close()
 
+class Scale:
+    state = TIMER_STOPPED
+    start = 0
+    total = 0
 
 if __name__ == '__main__':
     main()
