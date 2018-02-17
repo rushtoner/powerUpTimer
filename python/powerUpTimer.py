@@ -91,7 +91,7 @@ def main():
                         scaleLeft.state = TIMER_STOPPED
                         elapsedSec = time - scaleLeft.start
                         scaleLeft.total += elapsedSec
-                        print("Left side was closed for ", elapsedSec, " seconds, total time is ", scaleLeft.total)
+                        print("Left side was closed for %.1f, total time is %.1f sec" % (elapsedSec, scaleLeft.total))
                 newState = sample.get_digital_value(RIGHT)
                 if (scaleRight.state == TIMER_STOPPED):
                     # timer is stopped
@@ -106,7 +106,7 @@ def main():
                         scaleRight.state = TIMER_STOPPED
                         elapsedSec = time - scaleRight.start
                         scaleRight.total += elapsedSec
-                        print("Right side was closed for ", elapsedSec, " seconds, total time is ", scaleRight.total)
+                        print("Left side was closed for %.1f, total time is %.1f sec" % (elapsedSec, scaleRight.total))
             except Exception as ex:
                 print("caught in callback: ", ex)
                 print("sys.exc_info(): " + sys.exc_info())
