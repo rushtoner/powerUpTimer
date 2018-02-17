@@ -62,8 +62,6 @@ def main():
 
         remoteDevice.set_io_configuration(LEFT, IOMode.DIGITAL_IN)
         remoteDevice.set_io_configuration(RIGHT, IOMode.DIGITAL_IN)
-        #remoteDevice.set_io_configuration(DIGITAL_LINE, IOMode.DIGITAL_IN)
-        #remoteDevice.set_io_configuration(ANALOG_LINE, IOMode.ADC)
 
         # Enable periodic sampling every IO_SAMPLING_RATE seconds in the remote device.
         remoteDevice.set_io_sampling_rate(IO_SAMPLING_RATE)
@@ -72,32 +70,43 @@ def main():
         remoteDevice.set_dio_change_detection({LEFT})
         remoteDevice.set_dio_change_detection({RIGHT})
 
-
         scaleLeft = Scale()
+        scaleRight = Scale()
 
         # Register a listener to handle the samples received by the local device.
         def io_samples_callback(sample, remote, time):
             try:
                 #print("New sample from %s - %s at %s" % (remote.get_node_id(), sample, str(time)))
                 newState = sample.get_digital_value(LEFT)
-                #print("new LEFT State = ", newState)
                 if (scaleLeft.state == TIMER_STOPPED):
                     # timer is stopped
                     if (sample.get_digital_value(LEFT) == SWITCH_CLOSED):
                         #print("Timer was stopped, switch is now closed.")
-                        # Start the timer
                         scaleLeft.start = time
                         scaleLeft.state = TIMER_RUNNING
-                        #print("Starting timer at ", time)
                 else:
                     # timer is running
                     if (sample.get_digital_value(LEFT) == SWITCH_OPEN):
                         #print("Timer was running, switch is now open.")
-                        # Stop the timer
                         scaleLeft.state = TIMER_STOPPED
                         elapsedSec = time - scaleLeft.start
                         scaleLeft.total += elapsedSec
-                        print("Switch was closed for ", elapsedSec, " seconds, total time is ", scaleLeft.total)
+                        print("Left side was closed for ", elapsedSec, " seconds, total time is ", scaleLeft.total)
+                newState = sample.get_digital_value(RIGHT)
+                if (scaleRight.state == TIMER_STOPPED):
+                    # timer is stopped
+                    if (sample.get_digital_value(RIGHT) == SWITCH_CLOSED):
+                        #print("Timer was stopped, switch is now closed.")
+                        scaleRight.start = time
+                        scaleRight.state = TIMER_RUNNING
+                else:
+                    # timer is running
+                    if (sample.get_digital_value(RIGHT) == SWITCH_OPEN):
+                        #print("Timer was running, switch is now open.")
+                        scaleRight.state = TIMER_STOPPED
+                        elapsedSec = time - scaleRight.start
+                        scaleRight.total += elapsedSec
+                        print("Right side was closed for ", elapsedSec, " seconds, total time is ", scaleRight.total)
             except Exception as ex:
                 print("caught in callback: ", ex)
                 print("sys.exc_info(): " + sys.exc_info())
