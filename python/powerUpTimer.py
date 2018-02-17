@@ -106,10 +106,10 @@ def main():
                         scaleRight.state = TIMER_STOPPED
                         elapsedSec = time - scaleRight.start
                         scaleRight.total += elapsedSec
-                        print("Left side was closed for %.1f, total time is %.1f sec" % (elapsedSec, scaleRight.total))
+                        print("Right side was closed for %.1f, total time is %.1f sec" % (elapsedSec, scaleRight.total))
             except Exception as ex:
                 print("caught in callback: ", ex)
-                print("sys.exc_info(): " + sys.exc_info())
+                print("sys.exc_info(): ", sys.exc_info())
 
         print("Registering callback on ", remoteDevice)
         localDevice.add_io_sample_received_callback(io_samples_callback)
@@ -118,7 +118,7 @@ def main():
         print("Press enter to exit")
         input()
     except BaseException as ex:
-        print("Caught something: " + ex)
+        print("Caught something: ", ex)
 
     finally:
         if localDevice is not None and localDevice.is_open():
